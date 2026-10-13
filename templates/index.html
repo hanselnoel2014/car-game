@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}Car Race{% endblock %}
+
+{% block content %}
+<div class="screen center-screen home-screen">
+    <div class="title-card">
+        <div class="road-ani">
+            <div class="road-surface">
+                <div class="lane-mark lm1"></div>
+                <div class="lane-mark lm2"></div>
+                <div class="lane-mark lm3"></div>
+                <div class="lane-mark lm4"></div>
+                <div class="home-car">🚗</div>
+            </div>
+        </div>
+        <h1 class="game-title">CAR RACE</h1>
+        <p class="subtitle">💀 Hard mode only. No mercy.</p>
+        <div class="home-buttons">
+            <a href="/select" class="btn btn-primary btn-xl">PLAY NOW</a>
+        </div>
+        <div class="home-features">
+            <span>🚧 Obstacles</span>
+            <span>🚛 Traffic</span>
+            <span>💨 Speed Boost</span>
+            <span>🏁 5 Lanes</span>
+        </div>
+    </div>
+</div>
+{% endblock %}

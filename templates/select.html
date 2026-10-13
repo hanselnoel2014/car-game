@@ -1,0 +1,267 @@
+{% extends "base.html" %}
+{% block title %}Choose Your Car{% endblock %}
+
+{% block content %}
+<div class="screen center-screen">
+    <div class="select-container">
+        <h1 class="section-title">🚗 Pick Your Ride</h1>
+        <p class="section-sub">All cars. One mode. Survive.</p>
+
+        <div class="car-grid">
+            {% for car in cars %}
+            <div class="car-card" data-car="{{ car.id }}" onclick="selectCar('{{ car.id }}')">
+                <div class="car-preview-box">
+                    <canvas class="car-canvas" id="canvas-{{ car.id }}" width="100" height="140"></canvas>
+                </div>
+                <div class="car-info">
+                    <h2>{{ car.name }}</h2>
+                    <p>{{ car.description }}</p>
+                </div>
+                <div class="selected-tick">✓ SELECTED</div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <div class="action-row">
+            <a href="/" class="btn btn-secondary">← BACK</a>
+            <button class="btn btn-primary" id="start-btn" onclick="startGame()">RACE ▶</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let selectedCar = 'sports';
+
+// ── Inline mini car drawers (mirrors game.html logic, scaled down) ─────────────
+function miniCar(canvasId, type, body, accent) {
+    const canvas = document.getElementById(canvasId);
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    const cw = canvas.width, ch = canvas.height;
+    ctx.clearRect(0, 0, cw, ch);
+
+    // Background
+    const bg = ctx.createLinearGradient(0, 0, 0, ch);
+    bg.addColorStop(0, "#1e272e");
+    bg.addColorStop(1, "#2d3436");
+    ctx.fillStyle = bg;
+    ctx.beginPath(); ctx.roundRect(0, 0, cw, ch, 8); ctx.fill();
+
+    const cx = cw / 2, cy = ch / 2;
+    const scale = 1.1;
+
+    const DRAW = {
+        sports(w, h) {
+            w *= scale; h *= scale;
+            ctx.fillStyle = body;
+            ctx.beginPath();
+            ctx.moveTo(cx - w/2 + 6, cy + h/2);
+            ctx.lineTo(cx - w/2, cy);
+            ctx.quadraticCurveTo(cx - w/2, cy - h*0.4, cx - w/2 + 10, cy - h/2);
+            ctx.lineTo(cx + w/2 - 10, cy - h/2);
+            ctx.quadraticCurveTo(cx + w/2, cy - h*0.4, cx + w/2, cy);
+            ctx.lineTo(cx + w/2 - 6, cy + h/2);
+            ctx.closePath(); ctx.fill();
+            ctx.fillStyle = accent;
+            ctx.fillRect(cx - w/2 - 2, cy + h * 0.22, w + 4, 4);
+            ctx.fillRect(cx - w/2 + 8, cy + h * 0.16, 3, 8);
+            ctx.fillRect(cx + w/2 - 11, cy + h * 0.16, 3, 8);
+            ctx.fillStyle = "rgba(160,220,255,0.85)";
+            ctx.beginPath();
+            ctx.moveTo(cx - w/2 + 12, cy + h * 0.1);
+            ctx.quadraticCurveTo(cx - w/2 + 10, cy - h * 0.26, cx - w/2 + 14, cy - h * 0.26);
+            ctx.lineTo(cx + w/2 - 14, cy - h * 0.26);
+            ctx.quadraticCurveTo(cx + w/2 - 10, cy - h * 0.26, cx + w/2 - 12, cy + h * 0.1);
+            ctx.closePath(); ctx.fill();
+            lights(w, h);
+            wheels(w, h, false);
+        },
+        muscle(w, h) {
+            w *= scale; h *= scale;
+            ctx.fillStyle = body;
+            ctx.beginPath(); ctx.roundRect(cx - w/2, cy - h/2, w, h, 5); ctx.fill();
+            ctx.fillStyle = accent;
+            ctx.beginPath(); ctx.roundRect(cx - 7, cy - h/2 + 3, 14, 15, 3); ctx.fill();
+            ctx.fillStyle = "#111"; ctx.fillRect(cx - 5, cy - h/2 + 5, 10, 9);
+            ctx.fillStyle = accent;
+            ctx.beginPath();
+            ctx.moveTo(cx - w/2 + 5, cy - h * 0.05);
+            ctx.lineTo(cx + w/2 - 5, cy - h * 0.05);
+            ctx.lineTo(cx + w/2 - 11, cy + h * 0.28);
+            ctx.lineTo(cx - w/2 + 11, cy + h * 0.28);
+            ctx.closePath(); ctx.fill();
+            ctx.fillStyle = "rgba(160,220,255,0.8)";
+            ctx.beginPath(); ctx.roundRect(cx - w/2 + 8, cy - h * 0.04, w - 16, h * 0.13, 3); ctx.fill();
+            ctx.beginPath(); ctx.roundRect(cx - w/2 + 8, cy + h * 0.12, w - 16, h * 0.12, 3); ctx.fill();
+            ctx.fillStyle = "#777"; ctx.strokeStyle = "#555"; ctx.lineWidth = 1.5;
+            ctx.beginPath(); ctx.roundRect(cx - w/2 - 3, cy + h * 0.2, 5, 13, 2); ctx.fill(); ctx.stroke();
+            ctx.beginPath(); ctx.roundRect(cx + w/2 - 2, cy + h * 0.2, 5, 13, 2); ctx.fill(); ctx.stroke();
+            lights(w, h);
+            wheels(w, h, false);
+        },
+        suv(w, h) {
+            w *= scale; h *= scale;
+            ctx.fillStyle = body;
+            ctx.beginPath(); ctx.roundRect(cx - w/2, cy - h/2, w, h, 6); ctx.fill();
+            ctx.fillStyle = accent;
+            ctx.beginPath(); ctx.roundRect(cx - w/2 + 3, cy - h/2 + h * 0.6, w - 6, 9); ctx.fill();
+            ctx.fillStyle = body;
+            ctx.beginPath(); ctx.roundRect(cx - w/2 + 3, cy - h/2 + h * 0.14, w - 6, h * 0.48, 5); ctx.fill();
+            ctx.strokeStyle = "#666"; ctx.lineWidth = 1.5;
+            ctx.strokeRect(cx - w/2 + 6, cy - h/2 + h * 0.15, w - 12, 5);
+            ctx.fillStyle = "rgba(160,220,255,0.8)";
+            ctx.beginPath(); ctx.roundRect(cx - w/2 + 5, cy - h/2 + h * 0.15, w - 10, h * 0.15, 3); ctx.fill();
+            ctx.beginPath(); ctx.roundRect(cx - w/2 + 5, cy - h/2 + h * 0.34, w - 10, h * 0.14, 3); ctx.fill();
+            lights(w, h, true);
+            wheels(w, h, true);
+        },
+        classic(w, h) {
+            w *= scale; h *= scale;
+            ctx.fillStyle = body;
+            ctx.beginPath(); ctx.roundRect(cx - w/2, cy - h/2 + h * 0.18, w, h * 0.82, 10); ctx.fill();
+            ctx.fillStyle = accent;
+            ctx.beginPath();
+            ctx.moveTo(cx - w/2, cy); ctx.quadraticCurveTo(cx - w/2 - 7, cy + h * 0.2, cx - w/2, cy + h * 0.38);
+            ctx.lineTo(cx - w/2, cy); ctx.fill();
+            ctx.beginPath();
+            ctx.moveTo(cx + w/2, cy); ctx.quadraticCurveTo(cx + w/2 + 7, cy + h * 0.2, cx + w/2, cy + h * 0.38);
+            ctx.lineTo(cx + w/2, cy); ctx.fill();
+            ctx.fillStyle = accent;
+            ctx.beginPath(); ctx.roundRect(cx - w/2 + 3, cy - h/2 + h * 0.18, w - 6, h * 0.16, 8); ctx.fill();
+            ctx.fillStyle = body;
+            ctx.beginPath(); ctx.ellipse(cx, cy - h * 0.06, w * 0.37, h * 0.22, 0, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = "rgba(160,220,255,0.82)";
+            ctx.beginPath(); ctx.ellipse(cx, cy - h * 0.07, w * 0.28, h * 0.13, 0, 0, Math.PI * 2); ctx.fill();
+            ctx.strokeStyle = "#ddd"; ctx.lineWidth = 2.5;
+            ctx.beginPath(); ctx.moveTo(cx - w/2 + 5, cy - h/2 + h * 0.2); ctx.lineTo(cx + w/2 - 5, cy - h/2 + h * 0.2); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(cx - w/2 + 5, cy + h/2 - 3); ctx.lineTo(cx + w/2 - 5, cy + h/2 - 3); ctx.stroke();
+            ctx.fillStyle = "#fffde7"; ctx.shadowBlur = 5; ctx.shadowColor = "#ffe082";
+            ctx.beginPath(); ctx.arc(cx - w/2 + 7, cy - h/2 + h * 0.25, 4, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath(); ctx.arc(cx + w/2 - 7, cy - h/2 + h * 0.25, 4, 0, Math.PI * 2); ctx.fill();
+            ctx.shadowBlur = 0;
+            ctx.fillStyle = "#e74c3c";
+            ctx.beginPath(); ctx.arc(cx - w/2 + 7, cy + h/2 - 5, 3, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath(); ctx.arc(cx + w/2 - 7, cy + h/2 - 5, 3, 0, Math.PI * 2); ctx.fill();
+            wheels(w, h, false);
+        },
+        pickup(w, h) {
+            w *= scale; h *= scale;
+            ctx.fillStyle = accent;
+            ctx.beginPath(); ctx.roundRect(cx - w/2, cy, w, h * 0.5, 4); ctx.fill();
+            ctx.fillStyle = "#1a1a1a"; ctx.fillRect(cx - w/2 + 2, cy + h * 0.03, w - 4, h * 0.38);
+            ctx.fillStyle = body;
+            ctx.beginPath(); ctx.roundRect(cx - w/2, cy - h/2, w, h * 0.56, 6); ctx.fill();
+            ctx.fillStyle = accent;
+            ctx.beginPath(); ctx.roundRect(cx - w/2 + 3, cy - h/2 + h * 0.14, w - 6, h * 0.32, 4); ctx.fill();
+            ctx.fillStyle = "rgba(160,220,255,0.8)";
+            ctx.beginPath(); ctx.roundRect(cx - w/2 + 6, cy - h/2 + h * 0.16, w - 12, h * 0.12, 3); ctx.fill();
+            ctx.beginPath(); ctx.roundRect(cx - w/2 + 6, cy - h/2 + h * 0.3, w - 12, h * 0.11, 3); ctx.fill();
+            ctx.strokeStyle = "#aaa"; ctx.lineWidth = 2.5;
+            ctx.beginPath(); ctx.moveTo(cx - w/2 + 3, cy - h/2 + 1); ctx.lineTo(cx + w/2 - 3, cy - h/2 + 1); ctx.stroke();
+            lights(w, h, false);
+            wheels(w, h, true);
+        },
+        supercar(w, h) {
+            w *= scale * 0.95; h *= scale * 0.9;
+            ctx.fillStyle = body;
+            ctx.beginPath();
+            ctx.moveTo(cx - w/2 + 10, cy + h/2);
+            ctx.lineTo(cx - w/2, cy + h * 0.1);
+            ctx.quadraticCurveTo(cx - w/2, cy - h * 0.45, cx - w/2 + 14, cy - h/2);
+            ctx.lineTo(cx + w/2 - 14, cy - h/2);
+            ctx.quadraticCurveTo(cx + w/2, cy - h * 0.45, cx + w/2, cy + h * 0.1);
+            ctx.lineTo(cx + w/2 - 10, cy + h/2);
+            ctx.closePath(); ctx.fill();
+            // Diffuser
+            ctx.fillStyle = "#111"; ctx.fillRect(cx - w/2 + 4, cy + h/2 - 8, w - 8, 7);
+            // Spoiler
+            ctx.fillStyle = accent;
+            ctx.fillRect(cx - w/2 - 2, cy + h * 0.28, w + 4, 5);
+            ctx.fillRect(cx - w/2 + 9, cy + h * 0.21, 4, 9);
+            ctx.fillRect(cx + w/2 - 13, cy + h * 0.21, 4, 9);
+            // Vents
+            ctx.fillStyle = "#111";
+            ctx.fillRect(cx - w/2 + 4, cy - h * 0.04, 6, 12);
+            ctx.fillRect(cx + w/2 - 10, cy - h * 0.04, 6, 12);
+            ctx.fillStyle = "rgba(160,220,255,0.88)";
+            ctx.beginPath();
+            ctx.moveTo(cx - w/2 + 12, cy + h * 0.1);
+            ctx.quadraticCurveTo(cx - w/2 + 10, cy - h * 0.28, cx - w/2 + 16, cy - h * 0.28);
+            ctx.lineTo(cx + w/2 - 16, cy - h * 0.28);
+            ctx.quadraticCurveTo(cx + w/2 - 10, cy - h * 0.28, cx + w/2 - 12, cy + h * 0.1);
+            ctx.closePath(); ctx.fill();
+            ctx.fillStyle = "#fffde7"; ctx.shadowBlur = 10; ctx.shadowColor = "#ffe082";
+            ctx.beginPath(); ctx.roundRect(cx - w/2 + 3, cy - h/2 + 2, 12, 6, 2); ctx.fill();
+            ctx.beginPath(); ctx.roundRect(cx + w/2 - 15, cy - h/2 + 2, 12, 6, 2); ctx.fill();
+            ctx.shadowBlur = 0;
+            ctx.fillStyle = "#e74c3c";
+            ctx.fillRect(cx - w/2 + 3, cy + h/2 - 7, 10, 5);
+            ctx.fillRect(cx + w/2 - 13, cy + h/2 - 7, 10, 5);
+            wheels(w, h, false);
+        }
+    };
+
+    function lights(w, h, big = false) {
+        const sz = big ? 7 : 5;
+        ctx.fillStyle = "#fffde7"; ctx.shadowBlur = 6; ctx.shadowColor = "#ffe082";
+        ctx.fillRect(cx - w/2 + 3, cy - h/2 + 2, sz + 5, sz);
+        ctx.fillRect(cx + w/2 - sz - 8, cy - h/2 + 2, sz + 5, sz);
+        ctx.shadowBlur = 0;
+        ctx.fillStyle = "#e74c3c";
+        ctx.fillRect(cx - w/2 + 3, cy + h/2 - sz - 2, sz + 5, sz);
+        ctx.fillRect(cx + w/2 - sz - 8, cy + h/2 - sz - 2, sz + 5, sz);
+    }
+
+    function wheels(w, h, big = false) {
+        const ww = big ? 10 : 8, wh = big ? 15 : 12;
+        ctx.fillStyle = "#111";
+        [[cx - w/2 - 4, cy - h/2 + 7],[cx + w/2 - 4, cy - h/2 + 7],
+         [cx - w/2 - 4, cy + h/2 - 19],[cx + w/2 - 4, cy + h/2 - 19]].forEach(([wx, wy]) => {
+            ctx.beginPath(); ctx.roundRect(wx, wy, ww, wh, 3); ctx.fill();
+            ctx.strokeStyle = "#444"; ctx.lineWidth = 1; ctx.stroke();
+            ctx.fillStyle = "#888";
+            ctx.beginPath(); ctx.arc(wx + ww/2, wy + wh/2, ww * 0.28, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = "#111";
+        });
+    }
+
+    // Car dimensions for each type
+    const dims = {
+        sports:   [32, 54], muscle:  [38, 60], suv:    [42, 66],
+        classic:  [40, 62], pickup:  [42, 68], supercar:[30,52]
+    };
+    const [w, h] = dims[type] || [36, 58];
+
+    if (DRAW[type]) DRAW[type](w, h);
+}
+
+// ── Selection logic ────────────────────────────────────────────────────────────
+function selectCar(id) {
+    selectedCar = id;
+    document.querySelectorAll(".car-card").forEach(c => c.classList.remove("selected"));
+    document.querySelector(`.car-card[data-car="${id}"]`).classList.add("selected");
+}
+
+function startGame() {
+    window.location.href = `/game?car=${selectedCar}`;
+}
+
+// ── Init ───────────────────────────────────────────────────────────────────────
+const carDefs = {
+    sports:   { color: "#e74c3c", accent: "#c0392b" },
+    muscle:   { color: "#3498db", accent: "#2980b9" },
+    suv:      { color: "#2ecc71", accent: "#27ae60" },
+    classic:  { color: "#f39c12", accent: "#d35400" },
+    pickup:   { color: "#9b59b6", accent: "#8e44ad" },
+    supercar: { color: "#1abc9c", accent: "#16a085" },
+};
+
+Object.entries(carDefs).forEach(([id, cfg]) => {
+    miniCar(`canvas-${id}`, id, cfg.color, cfg.accent);
+});
+
+selectCar("sports");
+</script>
+{% endblock %}

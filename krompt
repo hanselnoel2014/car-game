@@ -1,0 +1,21 @@
+I am going to make a car game
+It should let you choose you choose a car from 3 diffrent car options
+there should be the car and a road
+there should be 3 roads
+there should be other cars in the game
+if u crash into one of the other cars the game is over
+the controls should be left and right and forward
+the others cars sould be able to move left and right and when they do the cars should blink left or right
+there should be 3 types of levels... easy medium and hard once you finish easy they should got to medium and so once
+--------------------------------------------------------------------------------------------------------------------
+tech stack
+fastapi
+jinja2
+app.py
+
+make the road bigger
+make obstacles like construction items potholes traffic cones ect.
+make it a little more realistic
+make all the cars diffrent designs such as old fasioned cars semi trucks sports cars and more!
+make the others cars faster
+remove all the modes and just make it hard mode
