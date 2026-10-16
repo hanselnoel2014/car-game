@@ -2,19 +2,90 @@
 {% block title %}Car Race — Hard Mode{% endblock %}
 
 {% block extra_head %}
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
 <style>
-    body { background: #111; margin: 0; overflow: hidden; display: flex; flex-direction: column; align-items: center; }
-    canvas { display: block; }
+    html, body {
+        background: #111;
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+        width: 100%;
+        height: 100%;
+        /* Prevent pull-to-refresh and bounce on iOS */
+        overscroll-behavior: none;
+        touch-action: none;
+    }
+    #game-wrap {
+        position: fixed;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+    canvas {
+        display: block;
+        /* Scale canvas to fill without stretching */
+        max-width: 100%;
+        max-height: 100%;
+    }
+    /* Touch D-pad */
+    #touch-controls {
+        display: none;
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        height: 130px;
+        z-index: 50;
+        pointer-events: none;
+    }
+    #touch-left, #touch-right, #touch-boost {
+        position: absolute;
+        bottom: 16px;
+        width: 90px;
+        height: 90px;
+        border-radius: 50%;
+        background: rgba(255,255,255,0.12);
+        border: 2px solid rgba(255,255,255,0.25);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.8rem;
+        pointer-events: all;
+        user-select: none;
+        -webkit-user-select: none;
+        touch-action: none;
+        transition: background 0.1s;
+    }
+    #touch-left  { left: 20px; }
+    #touch-right { left: 128px; }
+    #touch-boost { right: 20px; background: rgba(231,76,60,0.2); border-color: rgba(231,76,60,0.5); }
+    #touch-left.active, #touch-right.active  { background: rgba(255,255,255,0.3); }
+    #touch-boost.active { background: rgba(231,76,60,0.55); }
+    @media (pointer: coarse) {
+        #touch-controls { display: block; }
+    }
 </style>
 {% endblock %}
 
 {% block content %}
-<div id="ui-overlay">
-    <div id="hud">
-        <span id="level-badge" class="hud-badge">💀 HARD</span>
-        <span class="hud-item">Score <b id="score">0</b></span>
-        <span class="hud-item">Distance <b id="distance">0</b>m</span>
-        <span class="hud-item">Speed <b id="speed-val">0</b> km/h</span>
+<div id="game-wrap">
+    <div id="ui-overlay">
+        <div id="hud">
+            <span id="level-badge" class="hud-badge">💀 HARD</span>
+            <span class="hud-item">Score <b id="score">0</b></span>
+            <span class="hud-item hud-hide-xs">Distance <b id="distance">0</b>m</span>
+            <span class="hud-item">Speed <b id="speed-val">0</b></span>
+        </div>
+    </div>
+
+    <canvas id="gameCanvas"></canvas>
+
+    <div id="touch-controls">
+        <div id="touch-left">◀</div>
+        <div id="touch-right">▶</div>
+        <div id="touch-boost">▲</div>
     </div>
 </div>
 
@@ -26,7 +97,7 @@
         <div class="go-stats">
             <div><label>Score</label><span id="go-score">0</span></div>
             <div><label>Distance</label><span id="go-distance">0</span>m</div>
-            <div><label>Top Speed</label><span id="go-speed">0</span>km/h</div>
+            <div><label>Speed</label><span id="go-speed">0</span>km/h</div>
         </div>
         <div class="go-buttons">
             <button class="btn btn-primary" onclick="restartGame()">TRY AGAIN</button>
@@ -35,8 +106,6 @@
         </div>
     </div>
 </div>
-
-<canvas id="gameCanvas"></canvas>
 {% endblock %}
 
 {% block scripts %}
@@ -56,9 +125,22 @@ const OBSTACLE_RATE   = {{ level_cfg.obstacle_rate }};
 const canvas = document.getElementById("gameCanvas");
 const ctx    = canvas.getContext("2d");
 
-// Fill the viewport, road will be centered
-const CANVAS_W = Math.min(window.innerWidth, 900);
-const CANVAS_H = window.innerHeight - 52; // minus HUD
+const HUD_H = document.getElementById("ui-overlay").offsetHeight || 44;
+// On mobile, reserve bottom space for touch controls
+const isTouchDevice = window.matchMedia("(pointer: coarse)").matches;
+const TOUCH_H = isTouchDevice ? 130 : 0;
+
+function getCanvasSize() {
+    // Use visualViewport on mobile to avoid address bar issues
+    const vw = window.visualViewport ? window.visualViewport.width  : window.innerWidth;
+    const vh = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+    return {
+        w: Math.floor(Math.min(vw, 900)),
+        h: Math.floor(vh - HUD_H - TOUCH_H),
+    };
+}
+
+let { w: CANVAS_W, h: CANVAS_H } = getCanvasSize();
 canvas.width  = CANVAS_W;
 canvas.height = CANVAS_H;
 
@@ -140,10 +222,6 @@ document.addEventListener("keydown", e => {
         e.preventDefault();
 });
 document.addEventListener("keyup", e => { keys[e.key] = false; });
-
-const isLeft    = () => keys["ArrowLeft"]  || keys["a"];
-const isRight   = () => keys["ArrowRight"] || keys["d"];
-const isForward = () => keys["ArrowUp"]    || keys["w"];
 
 // ── Road drawing ─────────────────────────────────────────────────────────────
 function drawRoad() {
@@ -1131,7 +1209,44 @@ function render() {
     drawPlayerCar();
 }
 
-// ── Loop ───────────────────────────────────────────────────────────────────────
+// ── Touch controls ─────────────────────────────────────────────────────────
+const touchKeys = { left: false, right: false, up: false };
+
+function bindTouchBtn(id, key) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const on  = e => { e.preventDefault(); touchKeys[key] = true;  el.classList.add("active"); };
+    const off = e => { e.preventDefault(); touchKeys[key] = false; el.classList.remove("active"); };
+    el.addEventListener("touchstart",  on,  { passive: false });
+    el.addEventListener("touchend",    off, { passive: false });
+    el.addEventListener("touchcancel", off, { passive: false });
+}
+bindTouchBtn("touch-left",  "left");
+bindTouchBtn("touch-right", "right");
+bindTouchBtn("touch-boost", "up");
+
+const isLeft    = () => keys["ArrowLeft"]  || keys["a"] || touchKeys.left;
+const isRight   = () => keys["ArrowRight"] || keys["d"] || touchKeys.right;
+const isForward = () => keys["ArrowUp"]    || keys["w"] || touchKeys.up;
+
+// ── Orientation / resize ────────────────────────────────────────────────────
+function handleResize() {
+    const { w, h } = getCanvasSize();
+    // Only resize if meaningfully different (avoids mobile scroll jank)
+    if (Math.abs(canvas.width - w) > 4 || Math.abs(canvas.height - h) > 4) {
+        canvas.width  = w;
+        canvas.height = h;
+        // Reinit so player/road positions recalculate for new size
+        const wasRunning = state.running;
+        initState();
+        if (!wasRunning) state.running = false;
+    }
+}
+window.addEventListener("resize", handleResize);
+if (window.visualViewport)
+    window.visualViewport.addEventListener("resize", handleResize);
+
+// ── Game loop ────────────────────────────────────────────────────────────────
 function loop() { update(); render(); requestAnimationFrame(loop); }
 initState();
 loop();
